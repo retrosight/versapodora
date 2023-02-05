@@ -96,6 +96,7 @@ commoncsv.writeArrayToCsv(fields, cardDataList, "apple-card-combined.csv")
 
 if failurecount > 0:
     logging.critical("Something went wrong and the output may not be valid so check the script log and / or run with loglevel = INFO.")
+    logging.critical("Failure Count = " + str(failurecount))
 
 currenttime = datetime.datetime.utcnow().isoformat()
 logging.critical('End: ' + currenttime)
