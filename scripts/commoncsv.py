@@ -3,17 +3,23 @@ import logging
 import codecs
 
 
-def loadCscvIntoArray(csvPath):
+def loadCscvIntoList(csvPath):
 
-    localDict = []
-    localDict.clear()
+    localList = []
+    localList.clear()
 
     with codecs.open(csvPath, encoding='utf-8', errors='replace') as csvfile:
-        localDict = list(csv.DictReader(csvfile))
+        try:
+            localList = list(csv.DictReader(csvfile))
+            result = localList
+        except Exception as e:
+            logging.critical("Fail: " + csvPath)
+            logging.critical("Exception Message: " + repr(e))
+            result = None
 
     # logging.critical(list(localDict.keys()))
 
-    return localDict
+    return result
 
 
 def writeArrayToCsv(fields, data, filename):
