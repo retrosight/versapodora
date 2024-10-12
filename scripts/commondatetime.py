@@ -129,6 +129,22 @@ def getfiscalquarter(monthvalue):
     return result
 
 
+def getCalendarQuarter(monthvalue):
+
+    result = ""
+
+    if monthvalue == "01" or monthvalue == "02" or monthvalue == "03":
+        result = "Q1"
+    if monthvalue == "04" or monthvalue == "05" or monthvalue == "06":
+        result = "Q2"
+    if monthvalue == "07" or monthvalue == "08" or monthvalue == "09":
+        result = "Q3"
+    if monthvalue == "10" or monthvalue == "11" or monthvalue == "12":
+        result = "Q4"
+
+    return result
+
+
 def formattedtimestamp(input):
 
     result = time.strftime("%Y-%m-%d-%H-%M-%S", input)
@@ -172,3 +188,25 @@ def jiradatetoiso8601(input):
     logging.info(input)
 
     return input
+
+
+def convertDateToIso8601(value):
+    # Convert the mm/dd/yyyy in the original CSV to YYYY-MM-DD
+    # according to the ISO 8601 standard
+    # https://en.wikipedia.org/wiki/ISO_8601 Calendar dates
+    # logging.critical(value)
+    result = datetime.datetime.strptime(value, "%m/%d/%Y")
+    result = str(result)[0:10]
+    # logging.critical(result)
+    return result
+
+
+def convertAnotherDateToIso8601(value):
+    # Convert the mm/dd/yyyy hh:mm in the original CSV to YYYY-MM-DD
+    # according to the ISO 8601 standard
+    # https://en.wikipedia.org/wiki/ISO_8601 Calendar dates
+    # logging.critical(value)
+    result = datetime.datetime.strptime(value, "%m/%d/%Y %H:%M")
+    result = str(result)[0:10]
+    # logging.critical(result)
+    return result
