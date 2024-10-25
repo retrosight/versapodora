@@ -52,6 +52,8 @@ categorymappingstartswith = commoncsv.loadCscvIntoList(inputPath + "categorymapp
 # Outputs
 outputledger = commoncsv.loadCscvIntoList(outputPath + "output-ledgerChecking.csv")
 
+transactionIds = []
+
 for checkingDataFile in checkingDataInputFiles:
     checkingdatainput = []
     checkingdatainput.clear()
@@ -70,6 +72,10 @@ for checkingDataFile in checkingDataInputFiles:
             transaction['Category'] = ""
             transaction['Category Type'] = ""
             transaction['Account'] = checkingDataFile
+            if transaction['Transaction ID'] not in transactionIds:
+                transactionIds.append(transaction['Transaction ID'])
+            else:
+                logging.critical('Checking - Created reference for Transaction ID is a duplicate: ' + checkingDataFile + ' | ' + transaction['Transaction ID'])
             success = True
         except Exception as e:
             success = False
@@ -87,7 +93,7 @@ for checkingDataFile in checkingDataInputFiles:
 creditdatainput = []
 creditdatainput.clear()
 creditdatainput = commoncsv.loadCscvIntoList(inputPath + 'ExportedTransactions-Chase-8814.csv')
-hashValuesUsedAsTransactionId = []
+
 for transactionCredit in creditdatainput:
     success = False
 
@@ -104,8 +110,8 @@ for transactionCredit in creditdatainput:
     reference = transactionCredit['Posting Date'].replace('-', '') + ' ' + reference
     # logging.critical(reference)
     
-    if reference not in hashValuesUsedAsTransactionId:
-        hashValuesUsedAsTransactionId.append(reference)
+    if reference not in transactionIds:
+        transactionIds.append(reference)
     else:
         logging.critical('Created reference for Transaction ID is a duplicate. Exiting.')
         sys.exit()
@@ -235,7 +241,7 @@ else:
 
 # Stripe Transactions
 
-dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2024-10-11_083652.csv"
+dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2024-10-25_074456.csv"
 dataStripe = commoncsv.loadCscvIntoList(inputPath + dataStripeFilename)
 
 stripeList = []
