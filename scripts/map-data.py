@@ -241,7 +241,7 @@ else:
 
 # Stripe Transactions
 
-dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2024-10-25_074456.csv"
+dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2024-11-02_100157.csv"
 dataStripe = commoncsv.loadCscvIntoList(inputPath + dataStripeFilename)
 
 stripeList = []

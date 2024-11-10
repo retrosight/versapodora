@@ -1,6 +1,7 @@
 import csv
 import logging
 import codecs
+import traceback
 
 
 def loadCscvIntoList(csvPath):
@@ -27,17 +28,15 @@ def loadCscvIntoList(csvPath):
     return result
 
 
-def writeArrayToCsv(fields, data, filename):
-    logging.info('writeArrayToCsv')
-    localPath = "../local/output/"
+def writeArrayToCsv(fields, data, filepath):
 
     try:
-        csvDataPath = localPath + filename
-        with open(csvDataPath, mode='w') as csv_file:
+        with open(filepath, mode='w') as csv_file:
             csvWriter = csv.DictWriter(csv_file, fieldnames=fields)
             csvWriter.writeheader()
             for row in data:
                 csvWriter.writerow(row)
-            logging.critical("Success writing to: " + csvDataPath)
-    except Exception:
-        logging.exception('Failed to write to CSV file.')
+            logging.critical("Success writing CSV to: " + filepath)
+    except Exception as e:
+        logging.critical('Exception handled. Stack trace is as follows:')
+        logging.critical(traceback.print_exc())
