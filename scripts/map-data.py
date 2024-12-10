@@ -3,6 +3,8 @@ import logging
 import datetime
 import time
 import sys
+from pathlib import Path
+import re
 
 import commoncsv
 import commonlogging
@@ -32,67 +34,47 @@ if (__name__ == "__main__"):
     main(scriptname, loglevel, localDev)
 
 logging.critical(scriptname)
-currenttime = str(datetime.datetime.now(datetime.UTC))
+currenttime = str(datetime.datetime.now(datetime.timezone.utc))
 logging.critical('Start: ' + currenttime)
 
-localPath = "../local/"
-inputPath = localPath + "input/fierce/"
-outputPath = localPath + "output/fierce/"
+inputPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data"
 
-# Data inputs
-# checkingdatainput = commoncsv.loadCscvIntoList(inputPath + "ExportedTransactions-9635.csv")
-# checkingForRentInput = commoncsv.loadCscvIntoList(inputPath + 'ExportedTransactions-4341.csv')
+bankDataInputFiles = ['ExportedTransactions-9635.csv', 'ExportedTransactions-9494.csv', 'ExportedTransactions-5202.csv', 'ExportedTransactions-4341.csv']
+creditDataInputFiles = ['Chase8814_Activity20240101_20241209_20241209.CSV']
+dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2024-12-09_103657.csv"
 
-checkingDataInputFiles = ['ExportedTransactions-9635.csv', 'ExportedTransactions-4341.csv']
-
-# Mapping inputs
-categorymapping = commoncsv.loadCscvIntoList(inputPath + "categorymapping.csv")
-categorymappingstartswith = commoncsv.loadCscvIntoList(inputPath + "categorymapping-startswith.csv")
-
-# Outputs
-outputledger = commoncsv.loadCscvIntoList(outputPath + "output-ledgerChecking.csv")
+outputLedger = []
+outputLedger.clear()
 
 transactionIds = []
 
-for checkingDataFile in checkingDataInputFiles:
+for checkingDataFile in bankDataInputFiles:
+    bankDataFilePath = str(inputPath) + "/" + checkingDataFile
+    logging.critical(bankDataFilePath)
     checkingdatainput = []
     checkingdatainput.clear()
-    checkingdatainput = commoncsv.loadCscvIntoList(inputPath + checkingDataFile)
+    checkingdatainput = commoncsv.loadCscvIntoList(bankDataFilePath)
     for transaction in checkingdatainput:
-        success = False
-        try:
-            transaction['Posting Date'] = commondatetime.convertDateToIso8601(transaction['Posting Date'])
-            transaction['Effective Date'] = commondatetime.convertDateToIso8601(transaction['Effective Date'])
-            quarter = transaction['Posting Date']
-            quarter = quarter[5:7]
-            transaction['Quarter'] = commondatetime.getCalendarQuarter(quarter)
-            transaction['Year'] = transaction['Posting Date'][0:4]
-            transaction['Amount'] = "{:.2f}".format(round(float(transaction['Amount']), 2))
-            transaction['Balance'] = "{:.2f}".format(round(float(transaction['Balance']), 2))
-            transaction['Category'] = ""
-            transaction['Category Type'] = ""
-            transaction['Account'] = checkingDataFile
-            if transaction['Transaction ID'] not in transactionIds:
-                transactionIds.append(transaction['Transaction ID'])
-            else:
-                logging.critical('Checking - Created reference for Transaction ID is a duplicate: ' + checkingDataFile + ' | ' + transaction['Transaction ID'])
-            success = True
-        except Exception as e:
-            success = False
-            logging.critical("Exception Message: " + repr(e))
-            continue
-        if success is True:
-            inLedger = False
-            for ledgertransaction in outputledger:
-                if ledgertransaction['Reference Number'] == transaction['Reference Number']:
-                    inLedger = True
-                    break
-            if inLedger == False:
-                outputledger.append(transaction)
+        transaction['Posting Date'] = commondatetime.convertDateToIso8601(transaction['Posting Date'])
+        transaction['Effective Date'] = commondatetime.convertDateToIso8601(transaction['Effective Date'])
+        quarter = transaction['Posting Date']
+        quarter = quarter[5:7]
+        transaction['Quarter'] = commondatetime.getCalendarQuarter(quarter)
+        transaction['Year'] = transaction['Posting Date'][0:4]
+        transaction['Amount'] = "{:.2f}".format(round(float(transaction['Amount']), 2))
+        transaction['Balance'] = "{:.2f}".format(round(float(transaction['Balance']), 2))
+        transaction['Category Type'] = ""
+        transaction['Category'] = ""
+        transaction['Account'] = checkingDataFile
+        if transaction['Transaction ID'] not in transactionIds:
+            transactionIds.append(transaction['Transaction ID'])
+        else:
+            logging.critical('Checking - Created reference for Transaction ID is a duplicate: ' + checkingDataFile + ' | ' + transaction['Transaction ID'])
+        outputLedger.append(transaction)
 
 creditdatainput = []
 creditdatainput.clear()
-creditdatainput = commoncsv.loadCscvIntoList(inputPath + 'ExportedTransactions-Chase-8814.csv')
+creditdatainput = commoncsv.loadCscvIntoList(str(inputPath) + "/" + creditDataInputFiles[0])
 
 for transactionCredit in creditdatainput:
     success = False
@@ -152,76 +134,102 @@ for transactionCredit in creditdatainput:
 
     transactionCredit['Account'] = 'ExportedTransactions-Chase-8814.csv'
     del transactionCredit['Card']
+    outputLedger.append(transactionCredit)
 
-    success = True
-    # except Exception as e:
-    #     success = False
-    #     logging.critical("Exception Message: " + repr(e))
-    #     continue
-    if success is True:
-        inLedger = False
-        for ledgertransaction in outputledger:
-            if ledgertransaction['Transaction ID'] == transactionCredit['Transaction ID']:
-                inLedger = True
+outputLedger.sort(key=sortByTransactionId)
+
+logging.critical(len(outputLedger))
+
+regexMaps = []
+regexMaps.clear()
+regexMaps = commoncsv.loadCscvIntoList(str(inputPath) + "/" + 'regex-map.csv')
+
+venmoAndCheckTransactions = []
+venmoAndCheckTransactions.clear()
+venmoAndCheckTransactions = commoncsv.loadCscvIntoList(str(inputPath) + "/" + 'venmo-and-check-map.csv')
+
+descriptionList = []
+descriptionList.clear()
+
+allDescriptions = []
+allDescriptions.clear()
+
+for transactionLedger in outputLedger:
+    foundRegexMatch = False
+    matchCategoryTypeResult = ''
+    matchCategoryResult = ''
+    for regexMap in regexMaps:
+        currentPattern = rf"{regexMap['pattern']}"
+        if regexMap['group'] != '':
+            currentGroup = int(regexMap['group'])
+        else:
+            currentGroup = 0
+        currentGroupResult = regexMap['groupresult']
+        currentUuid = regexMap['uuid']
+        matchPattern = re.match(currentPattern, transactionLedger['Description'])
+        if matchPattern:
+            # logging.critical(currentGroup)
+            # logging.critical(currentUuid)
+            if currentGroup != 0:
+                matchGroup = matchPattern.group(currentGroup)
+                if matchGroup == currentGroupResult:
+                    matchCategoryTypeResult = regexMap['categorytype']
+                    matchCategoryResult = regexMap['category']
+                    foundRegexMatch = True
+            else:
+                # logging.critical(regexMap['categorytype'])
+                matchCategoryTypeResult = regexMap['categorytype']
+                matchCategoryResult = regexMap['category']
+                foundRegexMatch = True
+    transactionLedger['Category Type'] = matchCategoryTypeResult
+    transactionLedger['Category'] = matchCategoryResult
+
+    if transactionLedger['Category'] == '' and transactionLedger['Category Type'] == '':
+        for venmoAndCheckTransaction in venmoAndCheckTransactions:
+            if venmoAndCheckTransaction['Transaction ID'] == transactionLedger['Transaction ID']:
+                transactionLedger['Category'] = venmoAndCheckTransaction['category']
+                transactionLedger['Category Type'] = venmoAndCheckTransaction['categorytype']
                 break
-        if inLedger == False:
-            outputledger.append(transactionCredit)
-            # logging.info('Do Nothing')
 
-outputledger.sort(key=sortByTransactionId)
+    # logging.critical(transactionLedger)
+    if transactionLedger['Description'] not in allDescriptions and foundRegexMatch is False:
+        currentDescription = {}
+        currentDescription.clear()
+        currentDescription['Description'] = transactionLedger['Description']
+        descriptionList.append(currentDescription)
+        allDescriptions.append(transactionLedger['Description'])
 
-checkingCategoryTotals = []
-checkingCategoryTotals.clear()
+fields = outputLedger[0].keys()
+commoncsv.writeArrayToCsv(fields, outputLedger, str(inputPath) + "/outputLedger.csv")
+
+if len(descriptionList) > 0:
+    descriptionFields = descriptionList[0].keys()
+    commoncsv.writeArrayToCsv(descriptionFields, descriptionList, str(inputPath) + "/descriptionList.csv")
 
 categories = []
 categories.clear()
 
 blankCategories = False
-for ledgertransaction in outputledger:
-    for mapstartswith in categorymappingstartswith:
-        descriptionToCategorize = mapstartswith['DescriptionToCategorize']
-        if ledgertransaction['Description'].startswith(descriptionToCategorize):
-            evalTransactionCategory = mapstartswith['EvalTransactionCategory']
-            if ledgertransaction['Category Type'] == '':
-                ledgertransaction['Category Type'] = mapstartswith['CategoryType']
-            if ledgertransaction['Category'] == '':
-                ledgertransaction['Category'] = mapstartswith['Category']
-            if evalTransactionCategory == "TRUE":
-                if ledgertransaction['Category'] == '':
-                    ledgertransaction['Category'] = ledgertransaction['Transaction Category']
-            break
-    for map in categorymapping:
-        descriptionToCategorize = map['DescriptionToCategorize']
-        if ledgertransaction['Description'] == descriptionToCategorize:
-            evalTransactionCategory = map['EvalTransactionCategory']
-            if ledgertransaction['Category Type'] == '':
-                ledgertransaction['Category Type'] = map['CategoryType']
-            if ledgertransaction['Category'] == '':
-                ledgertransaction['Category'] = map['Category']
-            if evalTransactionCategory == "TRUE":
-                if ledgertransaction['Category'] == '':
-                    ledgertransaction['Category'] = ledgertransaction['Transaction Category']
-            break
-    if ledgertransaction['Category Type'] == "" or ledgertransaction['Category'] == "":
+for transactionLedger in outputLedger:
+    if transactionLedger['Category'] == '':
         blankCategories = True
-    if ledgertransaction['Category'] not in categories:
-        categories.append(ledgertransaction['Category'])
-
-# fields = outputledger[0].keys()
-fields = ['Transaction ID', 'Posting Date', 'Effective Date', 'Transaction Type', 'Amount', 'Check Number', 'Reference Number', 'Description', 'Transaction Category', 'Type', 'Balance', 'Memo', 'Extended Description', 'Category Type', 'Category', 'Year', 'Quarter', 'Account']
-commoncsv.writeArrayToCsv(fields, outputledger, "fierce/output-ledgerChecking.csv")
+    if transactionLedger['Category'] not in categories:
+        categories.append(transactionLedger['Category'])
 
 categories.sort()
 
 years = ['2023','2024','2025']
 quarters = ['Q1', 'Q2', 'Q3', 'Q4']
 
+bankingCategoryTotals = []
+bankingCategoryTotals.clear()
+
 if blankCategories is False:
     for year in years:
         for quarter in quarters:
             for category in categories:
                 totalForCategory = 0
-                for ledgertransaction in outputledger:
+                for ledgertransaction in outputLedger:
                     if ledgertransaction['Category'] == category and ledgertransaction['Year'] == year and ledgertransaction['Quarter'] == quarter:
                         currentvalue = 0
                         currentvalue = ledgertransaction['Amount']
@@ -232,43 +240,34 @@ if blankCategories is False:
                 currentCategoryTotal['total'] = "{:.2f}".format(round(totalForCategory,2))
                 currentCategoryTotal['year'] = year
                 currentCategoryTotal['quarter'] = quarter
-                checkingCategoryTotals.append(currentCategoryTotal)
+                bankingCategoryTotals.append(currentCategoryTotal)
 
     outputTotalFields = ['category', 'total', 'year', 'quarter']
-    commoncsv.writeArrayToCsv(outputTotalFields, checkingCategoryTotals, "fierce/output-" + "ledgerChecking-category-totals.csv")
+    commoncsv.writeArrayToCsv(outputTotalFields, bankingCategoryTotals, str(inputPath) + "/ledgerChecking-category-totals.csv")
 else:
-    logging.critical("Blank categories -- update data to update the totals.")
+    logging.critical("**** WARNING! Blank categories -- update data to update the totals. ****")
 
 # Stripe Transactions
 
-dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2024-11-02_100157.csv"
-dataStripe = commoncsv.loadCscvIntoList(inputPath + dataStripeFilename)
+dataStripe = commoncsv.loadCscvIntoList(str(inputPath) + "/" +  dataStripeFilename)
 
 stripeList = []
 stripeList.clear()
 
 for rowStripe in dataStripe:
-    stripeSsuccess = False
-    try:
-        rowStripe.pop('Client name')
-        rowStripe['Created (UTC)'] = commondatetime.convertAnotherDateToIso8601(rowStripe['Created (UTC)'])
-        rowStripe['Available On (UTC)'] = commondatetime.convertAnotherDateToIso8601(rowStripe['Available On (UTC)'])
-        quarter = rowStripe['Created (UTC)']
-        quarter = quarter[5:7]
-        rowStripe['Quarter'] = commondatetime.getCalendarQuarter(quarter)
-        rowStripe['Year'] = rowStripe['Created (UTC)'][0:4]
-        stripeSsuccess = True
-    except Exception as e:
-        success = False
-        logging.critical("Exception Message: " + repr(e))
-        continue
-    if success is True:
-        stripeList.append(rowStripe)
+    rowStripe.pop('Client name')
+    rowStripe['Created (UTC)'] = commondatetime.convertAnotherDateToIso8601(rowStripe['Created (UTC)'])
+    rowStripe['Available On (UTC)'] = commondatetime.convertAnotherDateToIso8601(rowStripe['Available On (UTC)'])
+    quarter = rowStripe['Created (UTC)']
+    quarter = quarter[5:7]
+    rowStripe['Quarter'] = commondatetime.getCalendarQuarter(quarter)
+    rowStripe['Year'] = rowStripe['Created (UTC)'][0:4]
+    stripeSsuccess = True
+    stripeList.append(rowStripe)
 
 stripeList.sort(key=sortByTransactionId)
-
-fieldsStripe = ['Transaction ID', 'Transaction Type', 'Source', 'Amount', 'Fee', 'Net', 'Currency', 'Created (UTC)', 'Available On (UTC)', 'Quarter', 'Year']
-commoncsv.writeArrayToCsv(fieldsStripe, stripeList, "fierce/output-" + dataStripeFilename)
+fieldsStripe = stripeList[0].keys()
+commoncsv.writeArrayToCsv(fieldsStripe, stripeList, str(inputPath) + "/" +  "output-" + dataStripeFilename)
 
 outputStripeTotals = []
 outputStripeTotals.clear()
@@ -290,8 +289,8 @@ for year in years:
         outputStripeTotals.append(currentStripeTotal)
 
 outputStripeTotalFields = ['totalamount', 'totalfee', 'year', 'quarter']
-commoncsv.writeArrayToCsv(outputStripeTotalFields, outputStripeTotals, "fierce/output-Card_Transactions-totals.csv")
+commoncsv.writeArrayToCsv(outputStripeTotalFields, outputStripeTotals, str(inputPath) + "/" + "output-Card_Transactions-totals.csv")
 
-currenttime = str(datetime.datetime.now(datetime.UTC))
+currenttime = str(datetime.datetime.now(datetime.timezone.utc))
 logging.critical('End: ' + currenttime)
 logging.shutdown()

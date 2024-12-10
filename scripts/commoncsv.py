@@ -24,6 +24,7 @@ def loadCscvIntoList(csvPath):
         result = "Folder"
     except Exception as e:
         logging.critical("Exception Message: " + repr(e))
+        logging.critical("Path: " + csvPath)
 
     return result
 

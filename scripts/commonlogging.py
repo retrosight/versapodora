@@ -28,7 +28,7 @@ def setup_logging(logfilename, loglevel, localDev):
         log_date = commondatetime.formattedtimestamp(time.localtime())
         logfilename = log_date + '-' + logfilename
 
-    logPath = "../resources/logs/"
+    logPath = "../local/logs/"
 
     if localDev is True or commonLocalDev is True:
         logPath = "../local/logs/"
