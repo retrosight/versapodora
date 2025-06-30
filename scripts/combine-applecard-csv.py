@@ -59,6 +59,8 @@ for file in files:
     success = True
     if file == ".DS_Store":
         continue
+    if file == "output":
+        continue
     logging.critical(file)
     cardData = commoncsv.loadCscvIntoList(inputPath + file)
     if cardData != "Folder":
@@ -77,11 +79,19 @@ for file in files:
             if success is True:
                 try:
                     row['Transaction Date'] = commondatetime.convertDateToIso8601(row['Transaction Date'])
+                except Exception as e:
+                    success = False
+                    failurecount = failurecount + 1
+                    logging.critical("Exception Message Transaction Date: " + repr(e))
+                    logging.critical(row)
+                    continue
+                try:
                     row['Clearing Date'] = commondatetime.convertDateToIso8601(row['Clearing Date'])
                 except Exception as e:
                     success = False
                     failurecount = failurecount + 1
-                    logging.critical("Exception Message: " + repr(e))
+                    logging.critical("Exception Message Clearing Date: " + repr(e))
+                    logging.critical(row)
                     continue
                 # add the row to the dictionary
                 if success is True:
@@ -91,20 +101,21 @@ for file in files:
     if failurecount > 0:
         filesSkipped.append(file)
 
-cardDataList.sort(key=sortByTransactionDate)
-
-logging.critical(len(cardDataList))
-
-fields = cardDataList[0].keys()
-outputFilePath = inputPath + outputfilename
-logging.critical(outputFilePath)
-commoncsv.writeArrayToCsv(fields, cardDataList, outputFilePath)
-
 if failurecount > 0:
     logging.critical("Something went wrong and the output may not be valid so check the script log and / or run with loglevel = INFO.")
     logging.critical("Failure Count = " + str(failurecount))
 
-logging.critical("Files Skipped: " + str(filesSkipped))
+if len(filesSkipped) > 0:
+    logging.critical("Files Skipped: " + str(filesSkipped))
+
+if failurecount == 0 and len(filesSkipped) == 0:
+
+    cardDataList.sort(key=sortByTransactionDate)
+    logging.critical('Success')
+    logging.critical('Entries Processed: ' + str(len(cardDataList)))
+    fields = cardDataList[0].keys()
+    outputFilePath = inputPath + 'output/' + outputfilename
+    commoncsv.writeArrayToCsv(fields, cardDataList, outputFilePath)
 
 currenttime = datetime.datetime.utcnow().isoformat()
 logging.critical('End: ' + currenttime)

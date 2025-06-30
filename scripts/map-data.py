@@ -37,11 +37,12 @@ logging.critical(scriptname)
 currenttime = str(datetime.datetime.now(datetime.timezone.utc))
 logging.critical('Start: ' + currenttime)
 
-inputPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data"
+inputPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data" / "input"
+outputPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data" / "output"
 
-bankDataInputFiles = ['ExportedTransactions-9635.csv', 'ExportedTransactions-9494.csv', 'ExportedTransactions-5202.csv', 'ExportedTransactions-4341.csv']
-creditDataInputFiles = ['Chase8814_Activity20240101_20241209_20241209.CSV']
-dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2024-12-09_103657.csv"
+bankDataInputFiles = ['9635.csv', '9494.csv', '5202.csv', '4341.csv']
+creditDataInputFiles = ['Chase4525_Activity20250101_20250620_20250620.CSV']
+dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2025-06-20_110815.csv"
 
 outputLedger = []
 outputLedger.clear()
@@ -83,7 +84,7 @@ for transactionCredit in creditdatainput:
     
     transactionCredit['Effective Date'] = commondatetime.convertDateToIso8601(transactionCredit['Transaction Date'])
     
-    reference = transactionCredit['Card'] + transactionCredit['Transaction Date'] + transactionCredit['Post Date'] + transactionCredit['Description'] + transactionCredit['Category'] + transactionCredit['Type'] + transactionCredit['Amount']
+    reference = transactionCredit['Transaction Date'] + transactionCredit['Post Date'] + transactionCredit['Description'] + transactionCredit['Category'] + transactionCredit['Type'] + transactionCredit['Amount']
     reference = reference.replace('/', '')
     reference = reference.replace('*', '')
     reference = reference.replace(' ', '')
@@ -133,7 +134,6 @@ for transactionCredit in creditdatainput:
     transactionCredit['Quarter'] = commondatetime.getCalendarQuarter(quarter)
 
     transactionCredit['Account'] = 'ExportedTransactions-Chase-8814.csv'
-    del transactionCredit['Card']
     outputLedger.append(transactionCredit)
 
 outputLedger.sort(key=sortByTransactionId)
@@ -200,11 +200,11 @@ for transactionLedger in outputLedger:
         allDescriptions.append(transactionLedger['Description'])
 
 fields = outputLedger[0].keys()
-commoncsv.writeArrayToCsv(fields, outputLedger, str(inputPath) + "/outputLedger.csv")
+commoncsv.writeArrayToCsv(fields, outputLedger, str(outputPath) + "/output-ledger.csv")
 
 if len(descriptionList) > 0:
     descriptionFields = descriptionList[0].keys()
-    commoncsv.writeArrayToCsv(descriptionFields, descriptionList, str(inputPath) + "/descriptionList.csv")
+    commoncsv.writeArrayToCsv(descriptionFields, descriptionList, str(outputPath) + "/descriptionList.csv")
 
 categories = []
 categories.clear()
@@ -243,7 +243,7 @@ if blankCategories is False:
                 bankingCategoryTotals.append(currentCategoryTotal)
 
     outputTotalFields = ['category', 'total', 'year', 'quarter']
-    commoncsv.writeArrayToCsv(outputTotalFields, bankingCategoryTotals, str(inputPath) + "/ledgerChecking-category-totals.csv")
+    commoncsv.writeArrayToCsv(outputTotalFields, bankingCategoryTotals, str(outputPath) + "/output-ledger-totals.csv")
 else:
     logging.critical("**** WARNING! Blank categories -- update data to update the totals. ****")
 
@@ -267,7 +267,7 @@ for rowStripe in dataStripe:
 
 stripeList.sort(key=sortByTransactionId)
 fieldsStripe = stripeList[0].keys()
-commoncsv.writeArrayToCsv(fieldsStripe, stripeList, str(inputPath) + "/" +  "output-" + dataStripeFilename)
+commoncsv.writeArrayToCsv(fieldsStripe, stripeList, str(outputPath) + "/" +  "output-" + dataStripeFilename)
 
 outputStripeTotals = []
 outputStripeTotals.clear()
@@ -289,7 +289,7 @@ for year in years:
         outputStripeTotals.append(currentStripeTotal)
 
 outputStripeTotalFields = ['totalamount', 'totalfee', 'year', 'quarter']
-commoncsv.writeArrayToCsv(outputStripeTotalFields, outputStripeTotals, str(inputPath) + "/" + "output-Card_Transactions-totals.csv")
+commoncsv.writeArrayToCsv(outputStripeTotalFields, outputStripeTotals, str(outputPath) + "/" + "output-Card_Transactions-totals.csv")
 
 currenttime = str(datetime.datetime.now(datetime.timezone.utc))
 logging.critical('End: ' + currenttime)
