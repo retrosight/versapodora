@@ -1,6 +1,7 @@
 import os
 import logging
 import datetime
+from pathlib import Path
 import time
 import sys
 
@@ -24,18 +25,20 @@ os.system('cls' if os.name == 'nt' else 'clear')
 
 # Setup logging
 scriptname = "combine-applecard-csv"
-loglevel = "CRITICAL"
+loglevel = "INFO"
 
 # Call main function
 if (__name__ == "__main__"):
     main(scriptname, loglevel, localDev)
 
 logging.critical(scriptname)
-currenttime = datetime.datetime.utcnow().isoformat()
+currenttime = str(datetime.datetime.now(datetime.timezone.utc))
 logging.critical('Start: ' + currenttime)
 
-outputfilename = "apple-savings-combined.csv"
-inputPath = "../local/input/applecard/"
+outputfilename = "apple-card-combined.csv"
+# inputPath = "../local/input/applecard/"
+# inputPath = Path.home() / "Documents" / "Finances" / "Spending Analysis" / "~data" / "Nance"
+inputPath = Path.home() / "Documents" / "Finances" / "Spending Analysis" / "~data" / "Apple-Card"
 
 files = []
 files.clear()
@@ -62,7 +65,7 @@ for file in files:
     if file == "output":
         continue
     logging.critical(file)
-    cardData = commoncsv.loadCscvIntoList(inputPath + file)
+    cardData = commoncsv.loadCscvIntoList(str(inputPath) + "/" + file)
     if cardData != "Folder":
         logging.info("Opening: " + file)
         if cardData is None:
@@ -114,9 +117,9 @@ if failurecount == 0 and len(filesSkipped) == 0:
     logging.critical('Success')
     logging.critical('Entries Processed: ' + str(len(cardDataList)))
     fields = cardDataList[0].keys()
-    outputFilePath = inputPath + 'output/' + outputfilename
+    outputFilePath = str(inputPath) + "/" +  outputfilename
     commoncsv.writeArrayToCsv(fields, cardDataList, outputFilePath)
 
-currenttime = datetime.datetime.utcnow().isoformat()
+currenttime = str(datetime.datetime.now(datetime.timezone.utc))
 logging.critical('End: ' + currenttime)
 logging.shutdown()

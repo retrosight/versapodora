@@ -12,14 +12,6 @@ from commonlogging import main
 import commondatetime
 
 
-def sortByTransactionDate(e):
-    return e['Transaction Date']
-
-
-def sortByTransactionId(e):
-    return e['Transaction ID']
-
-
 localDev = True
 
 # Clear the screen
@@ -37,12 +29,13 @@ logging.critical(scriptname)
 currenttime = str(datetime.datetime.now(datetime.timezone.utc))
 logging.critical('Start: ' + currenttime)
 
-inputPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data" / "input"
-outputPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data" / "output"
+inputPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data" / "input" / "2025"
+outputPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data" / "output" / "2025"
+metadataPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data" / "metadata"
 
 bankDataInputFiles = ['9635.csv', '9494.csv', '5202.csv', '4341.csv']
-creditDataInputFiles = ['Chase4525_Activity20250101_20250620_20250620.CSV']
-dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2025-06-20_110815.csv"
+creditDataInputFiles = ['Chase4525_Activity20250101_20251231_20260128.CSV']
+dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2026-01-16_100235.csv"
 
 outputLedger = []
 outputLedger.clear()
@@ -56,6 +49,7 @@ for checkingDataFile in bankDataInputFiles:
     checkingdatainput.clear()
     checkingdatainput = commoncsv.loadCscvIntoList(bankDataFilePath)
     for transaction in checkingdatainput:
+        transaction['Card'] = ''
         transaction['Posting Date'] = commondatetime.convertDateToIso8601(transaction['Posting Date'])
         transaction['Effective Date'] = commondatetime.convertDateToIso8601(transaction['Effective Date'])
         quarter = transaction['Posting Date']
@@ -66,6 +60,7 @@ for checkingDataFile in bankDataInputFiles:
         transaction['Balance'] = "{:.2f}".format(round(float(transaction['Balance']), 2))
         transaction['Category Type'] = ""
         transaction['Category'] = ""
+        transaction['Category Tax'] = ""
         transaction['Account'] = checkingDataFile
         if transaction['Transaction ID'] not in transactionIds:
             transactionIds.append(transaction['Transaction ID'])
@@ -76,6 +71,7 @@ for checkingDataFile in bankDataInputFiles:
 creditdatainput = []
 creditdatainput.clear()
 creditdatainput = commoncsv.loadCscvIntoList(str(inputPath) + "/" + creditDataInputFiles[0])
+logging.critical(str(inputPath) + "/" + creditDataInputFiles[0])
 
 for transactionCredit in creditdatainput:
     success = False
@@ -90,7 +86,7 @@ for transactionCredit in creditdatainput:
     reference = reference.replace(' ', '')
     reference = reference.replace('-', '')
     reference = reference.replace('.', '')
-    reference = transactionCredit['Posting Date'].replace('-', '') + ' ' + reference
+    reference = transactionCredit['Posting Date'].replace('-', '') + ' ' + reference    
     # logging.critical(reference)
     
     if reference not in transactionIds:
@@ -127,6 +123,8 @@ for transactionCredit in creditdatainput:
     
     transactionCredit['Category'] = ""
 
+    transactionCredit['Category Tax'] = ""
+
     transactionCredit['Year'] = transactionCredit['Posting Date'][0:4]
 
     quarter = transactionCredit['Posting Date']
@@ -136,17 +134,19 @@ for transactionCredit in creditdatainput:
     transactionCredit['Account'] = 'ExportedTransactions-Chase-8814.csv'
     outputLedger.append(transactionCredit)
 
-outputLedger.sort(key=sortByTransactionId)
+# outputLedger.sort(key=sortByTransactionId)
+
+outputLedger = sorted(outputLedger, key=lambda x: (x['Transaction ID']))
 
 logging.critical(len(outputLedger))
 
 regexMaps = []
 regexMaps.clear()
-regexMaps = commoncsv.loadCscvIntoList(str(inputPath) + "/" + 'regex-map.csv')
+regexMaps = commoncsv.loadCscvIntoList(str(metadataPath) + "/" + 'regex-map.csv')
 
-venmoAndCheckTransactions = []
-venmoAndCheckTransactions.clear()
-venmoAndCheckTransactions = commoncsv.loadCscvIntoList(str(inputPath) + "/" + 'venmo-and-check-map.csv')
+transactionMaps = []
+transactionMaps.clear()
+transactionMaps = commoncsv.loadCscvIntoList(str(metadataPath) + "/" + 'transaction-map.csv')
 
 descriptionList = []
 descriptionList.clear()
@@ -158,6 +158,7 @@ for transactionLedger in outputLedger:
     foundRegexMatch = False
     matchCategoryTypeResult = ''
     matchCategoryResult = ''
+    matchCategoryTaxResult = ''
     for regexMap in regexMaps:
         currentPattern = rf"{regexMap['pattern']}"
         if regexMap['group'] != '':
@@ -175,20 +176,24 @@ for transactionLedger in outputLedger:
                 if matchGroup == currentGroupResult:
                     matchCategoryTypeResult = regexMap['categorytype']
                     matchCategoryResult = regexMap['category']
+                    matchCategoryTaxResult = regexMap['taxcategory']
                     foundRegexMatch = True
             else:
                 # logging.critical(regexMap['categorytype'])
                 matchCategoryTypeResult = regexMap['categorytype']
                 matchCategoryResult = regexMap['category']
+                matchCategoryTaxResult = regexMap['taxcategory']
                 foundRegexMatch = True
     transactionLedger['Category Type'] = matchCategoryTypeResult
     transactionLedger['Category'] = matchCategoryResult
+    transactionLedger['Category Tax'] = matchCategoryTaxResult
 
-    if transactionLedger['Category'] == '' and transactionLedger['Category Type'] == '':
-        for venmoAndCheckTransaction in venmoAndCheckTransactions:
-            if venmoAndCheckTransaction['Transaction ID'] == transactionLedger['Transaction ID']:
-                transactionLedger['Category'] = venmoAndCheckTransaction['category']
-                transactionLedger['Category Type'] = venmoAndCheckTransaction['categorytype']
+    if transactionLedger['Category Type'] == '' or transactionLedger['Category'] == '':
+        for transactionMap in transactionMaps:
+            if transactionMap['Transaction ID'] == transactionLedger['Transaction ID']:
+                transactionLedger['Category'] = transactionMap['category']
+                transactionLedger['Category Type'] = transactionMap['categorytype']
+                transactionLedger['Category Tax'] = transactionMap['taxcategory']
                 break
 
     # logging.critical(transactionLedger)
@@ -209,14 +214,21 @@ if len(descriptionList) > 0:
 categories = []
 categories.clear()
 
+categoriesTax = []
+categoriesTax.clear()
+
 blankCategories = False
 for transactionLedger in outputLedger:
     if transactionLedger['Category'] == '':
         blankCategories = True
     if transactionLedger['Category'] not in categories:
         categories.append(transactionLedger['Category'])
+    if transactionLedger['Category Tax'] not in categoriesTax:
+        categoriesTax.append(transactionLedger['Category Tax'])
 
 categories.sort()
+
+
 
 years = ['2023','2024','2025']
 quarters = ['Q1', 'Q2', 'Q3', 'Q4']
@@ -224,9 +236,13 @@ quarters = ['Q1', 'Q2', 'Q3', 'Q4']
 bankingCategoryTotals = []
 bankingCategoryTotals.clear()
 
+bankingCategoryTaxTotals = []
+bankingCategoryTaxTotals.clear()
+
 if blankCategories is False:
     for year in years:
         for quarter in quarters:
+
             for category in categories:
                 totalForCategory = 0
                 for ledgertransaction in outputLedger:
@@ -234,7 +250,7 @@ if blankCategories is False:
                         currentvalue = 0
                         currentvalue = ledgertransaction['Amount']
                         totalForCategory += float(currentvalue)
-                currentCategoryTotal ={}
+                currentCategoryTotal = {}
                 currentCategoryTotal.clear()
                 currentCategoryTotal['category'] = category
                 currentCategoryTotal['total'] = "{:.2f}".format(round(totalForCategory,2))
@@ -242,8 +258,27 @@ if blankCategories is False:
                 currentCategoryTotal['quarter'] = quarter
                 bankingCategoryTotals.append(currentCategoryTotal)
 
-    outputTotalFields = ['category', 'total', 'year', 'quarter']
+            for categoryTax in categoriesTax:
+                totalForCategoryTax = 0
+                for ledgertransaction in outputLedger:
+                    if ledgertransaction['Category Tax'] == categoryTax and ledgertransaction['Year'] == year and ledgertransaction['Quarter'] == quarter:
+                        currentvalue = 0
+                        currentvalue = ledgertransaction['Amount']
+                        totalForCategoryTax += float(currentvalue)
+                currentCategoryTaxTotal = {}
+                currentCategoryTaxTotal.clear()
+                currentCategoryTaxTotal['categorytax'] = categoryTax
+                currentCategoryTaxTotal['total'] = "{:.2f}".format(round(totalForCategoryTax,2))
+                currentCategoryTaxTotal['year'] = year
+                currentCategoryTaxTotal['quarter'] = quarter
+                bankingCategoryTaxTotals.append(currentCategoryTaxTotal)
+
+    bankingCategoryTaxTotals = sorted(bankingCategoryTaxTotals, key=lambda x: (x['year'], x['quarter'], x['categorytax']))
+    
+    outputTotalFields = bankingCategoryTotals[0].keys()
     commoncsv.writeArrayToCsv(outputTotalFields, bankingCategoryTotals, str(outputPath) + "/output-ledger-totals.csv")
+    outputTotalTaxFields = bankingCategoryTaxTotals[0].keys()
+    commoncsv.writeArrayToCsv(outputTotalTaxFields, bankingCategoryTaxTotals, str(outputPath) + "/output-ledger-tax-totals.csv")
 else:
     logging.critical("**** WARNING! Blank categories -- update data to update the totals. ****")
 
@@ -265,7 +300,10 @@ for rowStripe in dataStripe:
     stripeSsuccess = True
     stripeList.append(rowStripe)
 
-stripeList.sort(key=sortByTransactionId)
+# stripeList.sort(key=sortByTransactionId)
+
+stripeList = sorted(stripeList, key=lambda x: (x['Transaction ID']))
+
 fieldsStripe = stripeList[0].keys()
 commoncsv.writeArrayToCsv(fieldsStripe, stripeList, str(outputPath) + "/" +  "output-" + dataStripeFilename)
 
