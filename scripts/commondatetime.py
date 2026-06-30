@@ -210,3 +210,38 @@ def convertAnotherDateToIso8601(value):
     result = str(result)[0:10]
     # logging.critical(result)
     return result
+
+
+def parse_date(date_str):
+    """Parse various date formats and return ISO8601 YYYY-MM-DD string."""
+    date_str = date_str.strip()
+    
+    formats = [
+        "%Y-%m-%dT%H:%M:%SZ",  # 2025-01-02T06:25:08Z
+        "%Y-%m-%d",            # 2025-06-25
+        "%m/%d/%Y",            # 01/02/2025, 08/25/2025
+        "%m/%d/%y",            # 02/13/26
+    ]
+    
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    
+    raise ValueError(f"Unable to parse date: {date_str}")
+
+
+def convertDateToIso8601WithHint(date_str, hint):
+
+    if hint == "YYYY-MM-DD":
+        fmt = "%Y-%m-%d"
+    if hint == "MM/DD/YYYY":
+        fmt = "%m/%d/%Y"
+    if hint == "M/D/YYYY":
+        fmt = "%m/%d/%Y"
+    
+    try:
+        return datetime.datetime.strptime(date_str, fmt).strftime("%Y-%m-%d")
+    except ValueError: 
+        raise ValueError(f"Unable to parse date: {date_str}")

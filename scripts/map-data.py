@@ -29,13 +29,13 @@ logging.critical(scriptname)
 currenttime = str(datetime.datetime.now(datetime.timezone.utc))
 logging.critical('Start: ' + currenttime)
 
-inputPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data" / "input" / "2025"
-outputPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data" / "output" / "2025"
+inputPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data" / "input" / "2026"
+outputPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data" / "output" / "2026"
 metadataPath = Path.home() / "Documents" / "Finances" / "fierce-waterfall-data" / "metadata"
 
 bankDataInputFiles = ['9635.csv', '9494.csv', '5202.csv', '4341.csv']
-creditDataInputFiles = ['Chase4525_Activity20250101_20251231_20260128.CSV']
-dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2026-01-16_100235.csv"
+creditDataInputFiles = ['Chase4525_Activity20260101_20260629_20260629.CSV']
+dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2026-06-29_174535.csv"
 
 outputLedger = []
 outputLedger.clear()
@@ -80,7 +80,7 @@ for transactionCredit in creditdatainput:
     
     transactionCredit['Effective Date'] = commondatetime.convertDateToIso8601(transactionCredit['Transaction Date'])
     
-    reference = transactionCredit['Transaction Date'] + transactionCredit['Post Date'] + transactionCredit['Description'] + transactionCredit['Category'] + transactionCredit['Type'] + transactionCredit['Amount']
+    reference = transactionCredit['Transaction Date'] + transactionCredit['Post Date'] + transactionCredit['Description'] + transactionCredit['Category'] + transactionCredit['Type'] + transactionCredit['Amount'] + transactionCredit['Memo']
     reference = reference.replace('/', '')
     reference = reference.replace('*', '')
     reference = reference.replace(' ', '')
@@ -93,6 +93,7 @@ for transactionCredit in creditdatainput:
         transactionIds.append(reference)
     else:
         logging.critical('Created reference for Transaction ID is a duplicate. Exiting.')
+        logging.critical("TransactionID: " + reference)
         sys.exit()
     transactionCredit['Transaction ID'] = reference
 
@@ -133,8 +134,6 @@ for transactionCredit in creditdatainput:
 
     transactionCredit['Account'] = 'ExportedTransactions-Chase-8814.csv'
     outputLedger.append(transactionCredit)
-
-# outputLedger.sort(key=sortByTransactionId)
 
 outputLedger = sorted(outputLedger, key=lambda x: (x['Transaction ID']))
 
@@ -217,10 +216,17 @@ categories.clear()
 categoriesTax = []
 categoriesTax.clear()
 
+categoriesMissing = []
+categoriesMissing.clear()
+
 blankCategories = False
 for transactionLedger in outputLedger:
     if transactionLedger['Category'] == '':
         blankCategories = True
+        missingCategory = {}
+        missingCategory.clear()
+        missingCategory['Description'] = transactionLedger['Description']
+        categoriesMissing.append(missingCategory)
     if transactionLedger['Category'] not in categories:
         categories.append(transactionLedger['Category'])
     if transactionLedger['Category Tax'] not in categoriesTax:
@@ -228,9 +234,7 @@ for transactionLedger in outputLedger:
 
 categories.sort()
 
-
-
-years = ['2023','2024','2025']
+years = ['2023','2024','2025', '2026', '2027', '2028']
 quarters = ['Q1', 'Q2', 'Q3', 'Q4']
 
 bankingCategoryTotals = []
@@ -280,6 +284,8 @@ if blankCategories is False:
     outputTotalTaxFields = bankingCategoryTaxTotals[0].keys()
     commoncsv.writeArrayToCsv(outputTotalTaxFields, bankingCategoryTaxTotals, str(outputPath) + "/output-ledger-tax-totals.csv")
 else:
+    categoriesMissingFields = categoriesMissing[0].keys()
+    commoncsv.writeArrayToCsv(categoriesMissingFields, categoriesMissing, str(outputPath) + "/categoriesMissingFields.csv")
     logging.critical("**** WARNING! Blank categories -- update data to update the totals. ****")
 
 # Stripe Transactions
@@ -299,8 +305,6 @@ for rowStripe in dataStripe:
     rowStripe['Year'] = rowStripe['Created (UTC)'][0:4]
     stripeSsuccess = True
     stripeList.append(rowStripe)
-
-# stripeList.sort(key=sortByTransactionId)
 
 stripeList = sorted(stripeList, key=lambda x: (x['Transaction ID']))
 

@@ -2,6 +2,7 @@ import csv
 import logging
 import codecs
 import traceback
+import hashlib
 
 
 def loadCscvIntoList(csvPath):
@@ -41,3 +42,8 @@ def writeArrayToCsv(fields, data, filepath):
     except Exception as e:
         logging.critical('Exception handled. Stack trace is as follows:')
         logging.critical(traceback.print_exc())
+
+
+def hashDictKeys(d):
+    key = ",".join(sorted(d.keys())).encode()
+    return hashlib.md5(key).hexdigest()

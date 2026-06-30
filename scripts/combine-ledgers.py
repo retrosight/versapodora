@@ -18,7 +18,7 @@ localDev = True
 os.system('cls' if os.name == 'nt' else 'clear')
 
 # Setup logging
-scriptname = "map-data"
+scriptname = os.path.basename(__file__)
 loglevel = "CRITICAL"
 
 # Call main function
@@ -33,41 +33,118 @@ pathBase = Path.home() / "Documents" / "Finances" / "Spending Analysis" / "2025"
 inputPath = pathBase / "input"
 outputPath = pathBase / "output"
 metadataPath = pathBase / "metadata"
+mappingPath = pathBase / "mapping"
 
-bankDataInputFiles = ['9635.csv', '9494.csv', '5202.csv', '4341.csv']
-creditDataInputFiles = ['Chase4525_Activity20250101_20251231_20260128.CSV']
-dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2026-01-16_100235.csv"
+files = []
+files.clear()
+
+for filename in os.listdir(inputPath):
+    files.append(filename)
+
+files.sort()
+
+filesSkipped = []
+filesSkipped.clear()
+
+# inputDataFiles = ['9635.csv', '9494.csv', '5202.csv', '4341.csv']
+# creditDataInputFiles = ['Chase4525_Activity20250101_20251231_20260128.CSV']
+# dataStripeFilename = "Card_Transactions_Report_For_Fierce_Waterfall_PLLC_2026-01-16_100235.csv"
 
 outputLedger = []
 outputLedger.clear()
 
 transactionIds = []
 
-for checkingDataFile in bankDataInputFiles:
-    bankDataFilePath = str(inputPath) + "/" + checkingDataFile
-    logging.critical(bankDataFilePath)
-    checkingdatainput = []
-    checkingdatainput.clear()
-    checkingdatainput = commoncsv.loadCscvIntoList(bankDataFilePath)
-    for transaction in checkingdatainput:
-        transaction['Card'] = ''
-        transaction['Posting Date'] = commondatetime.convertDateToIso8601(transaction['Posting Date'])
-        transaction['Effective Date'] = commondatetime.convertDateToIso8601(transaction['Effective Date'])
-        quarter = transaction['Posting Date']
-        quarter = quarter[5:7]
-        transaction['Quarter'] = commondatetime.getCalendarQuarter(quarter)
-        transaction['Year'] = transaction['Posting Date'][0:4]
-        transaction['Amount'] = "{:.2f}".format(round(float(transaction['Amount']), 2))
-        transaction['Balance'] = "{:.2f}".format(round(float(transaction['Balance']), 2))
-        transaction['Category Type'] = ""
-        transaction['Category'] = ""
-        transaction['Category Tax'] = ""
-        transaction['Account'] = checkingDataFile
-        if transaction['Transaction ID'] not in transactionIds:
-            transactionIds.append(transaction['Transaction ID'])
-        else:
-            logging.critical('Checking - Created reference for Transaction ID is a duplicate: ' + checkingDataFile + ' | ' + transaction['Transaction ID'])
-        outputLedger.append(transaction)
+outputLedgerData = []
+outputLedgerData.clear()
+
+for file in files:
+
+    success = True
+    if file == ".DS_Store":
+        continue
+    if file == "output":
+        continue
+    if file == "New Folder With Items":
+        continue
+    logging.critical(file)
+    inputData = commoncsv.loadCscvIntoList(str(inputPath) + "/" + file)
+    hashOfKeys = commoncsv.hashDictKeys(inputData[0])
+    logging.critical(hashOfKeys)
+
+    mapping = {}
+    mapping.clear()
+    mapping = commoncsv.loadCscvIntoList(str(mappingPath) + "/" + hashOfKeys + ".csv")
+
+    dataRowTemplate = {}
+    dataRowTemplate.clear()
+
+    for mappingRow in mapping:
+        dataRowTemplate[mappingRow['outputField']] = ""
+
+    for inputDataRow in inputData:
+
+        dataRow = dataRowTemplate.copy()
+
+        for (key, value) in inputDataRow.items():
+            for mappingRow in mapping:
+                if mappingRow['inputField'] == key:
+                    if value != "":
+                        if mappingRow['dateFormat'] != "":
+                            value = commondatetime.convertDateToIso8601WithHint(value, mappingRow['dateFormat'])
+                        dataRow[mappingRow['outputField']] = value
+        dataRow['dataFile'] = file
+        outputLedgerData.append(dataRow)
+
+descriptionDupes = []
+descriptionDupes.clear()
+
+descriptionsList = []
+descriptionsList.clear()
+
+for outputLedgerDataRow in outputLedgerData:
+    if outputLedgerDataRow['Description'] not in descriptionDupes:
+        descriptionItem = {}
+        descriptionItem.clear()
+        descriptionItem['Description'] = outputLedgerDataRow['Description']
+        descriptionsList.append(descriptionItem)
+        descriptionDupes.append(outputLedgerDataRow['Description'])
+descriptionsListFields = descriptionsList[0].keys()
+commoncsv.writeArrayToCsv(descriptionsListFields, descriptionsList, str(outputPath) + "/descriptionsList.csv")
+
+outputLedgerDataFields = outputLedgerData[0].keys()
+commoncsv.writeArrayToCsv(outputLedgerDataFields, outputLedgerData, str(outputPath) + "/outputLedgerData.csv")
+
+
+
+sys.exit()
+
+    # inputDataFilePath = str(inputPath) + "/" + file
+    # logging.critical(inputDataFilePath)
+    # dataInput = []
+    # dataInput.clear()
+    # dataInput = commoncsv.loadCscvIntoList(inputDataFilePath)
+    # for transaction in dataInput:
+    #     transaction['Card'] = ''
+    #     transaction['Posting Date'] = commondatetime.convertDateToIso8601(transaction['Posting Date'])
+    #     transaction['Effective Date'] = commondatetime.convertDateToIso8601(transaction['Effective Date'])
+    #     quarter = transaction['Posting Date']
+    #     quarter = quarter[5:7]
+    #     transaction['Quarter'] = commondatetime.getCalendarQuarter(quarter)
+    #     transaction['Year'] = transaction['Posting Date'][0:4]
+    #     transaction['Amount'] = "{:.2f}".format(round(float(transaction['Amount']), 2))
+    #     transaction['Balance'] = "{:.2f}".format(round(float(transaction['Balance']), 2))
+    #     transaction['Category Type'] = ""
+    #     transaction['Category'] = ""
+    #     transaction['Category Tax'] = ""
+    #     transaction['Account'] = file
+    #     if transaction['Transaction ID'] not in transactionIds:
+    #         transactionIds.append(transaction['Transaction ID'])
+    #     else:
+    #         logging.critical('Checking - Created reference for Transaction ID is a duplicate: ' + file + ' | ' + transaction['Transaction ID'])
+    #     outputLedger.append(transaction)
+
+
 
 creditdatainput = []
 creditdatainput.clear()
